@@ -1,5 +1,3 @@
-
-
 #include <vector>
 #include <string>
 #include <iomanip>
@@ -15,7 +13,6 @@
 #define E_IDX_NONE unsigned int(-1)
 
 #include "Array.h"
-#include <stdio.h>
 
 using CoordArray = Array<double>;
 using IntArr = Array<int>;
@@ -31,7 +28,7 @@ public:
   {
   std::string                  line, entity;
   char cline[512];
-  std::vector<std::string> words;
+  char* words[10];
   std::ifstream                file (filename);
   FILE * fp = fopen(filename, "r");
   int                          nb_entities, i, nb_read;
@@ -64,12 +61,12 @@ public:
     if (line.empty())
       continue;
             
-    get_words(line, ' ', words);
+    get_words(line, ' ', &words[0]);
 
     if ((curType == VERT) && (nb_read < nb_entities))
     {
       for (i = 0; i < 3; ++i)
-        P[i] = fast_atof(words[i].c_str());
+        P[i] = fast_atof(words[i]);
 
       pos.add(P);
       ++nb_read;
@@ -80,7 +77,7 @@ public:
     {
       nods = nb_nodes[curType];
       for (i = 0; i < nods; ++i)
-        S[i] = fast_atoindex(words[i].c_str())-1;
+        S[i] = fast_atoindex(words[i])-1;
 
       switch (curType)
       {
@@ -113,7 +110,7 @@ public:
       line = cline;
       get_words(line, ' ', words);
 
-      nb_entities = atoi(words[0].c_str());
+      nb_entities = atoi(words[0]);
       nb_read=0;
 
       if (entity == "Vertices\n")
@@ -155,8 +152,7 @@ public:
   static int write(const char* filename, const CoordArray& crd, const IntArr& cnt, const char* elt_type = nullptr, const std::vector<bool>* keep = 0, const std::vector<int>* colors = 0)
   {
     if (crd.size() == 0)
-    return 0;
-
+      return 0;
     FILE * file = fopen(filename, "w");
     int  nb_pts(crd.size()), COLS(cnt.size()), dim(3);
 
@@ -277,22 +273,123 @@ public:
   
   return 0;
   }
+
+  template <typename ELT>
+  static int write(const char* filename, const CoordArray& crd, const std::vector<ELT*>& elts)
+  {
+    if (crd.size() == 0)
+      return 0;
+    FILE * file = fopen(filename, "w");
+    int  nb_pts(crd.size()), NB_ELTS(elts.size()), dim(3);
+
+    // Header
+    fprintf(file, "MeshVersionFormatted 1\n");
+    fprintf(file, "Dimension %i\n", dim);
+
+    // Points
+    fprintf(file, "Vertices\n");
+    fprintf(file, "%i\n", nb_pts);
+
+    const double* pP;
+
+    if (dim == 3)
+    {
+      for (int i = 0; i < nb_pts; ++i)
+      {
+        pP = crd.get(i);
+        fprintf(file, "%f %f %f 0\n", *(pP), *(pP + 1), *(pP + 2));
+      }
+    }
+    else if (dim == 2)
+    {
+      for (int i = 0; i < nb_pts; ++i)
+      {
+        pP = crd.get(i);
+        fprintf(file, "%f %f 0\n", *(pP), *(pP + 1));
+      }
+    }
+
+    fprintf(file, "\n");
+
+    if (NB_ELTS == 0)
+    {
+      fprintf(file, "End\n");
+      fclose(file);
+    }
+
+    // Connectivity. ONLY DEAL WITH T3 and Q4
+    int nb_T3s = 0;
+    int nb_Q4s = 0;
+
+    // check if pure or mixed type
+    for (size_t i = 0; i < NB_ELTS; ++i) {
+      nb_T3s += (elts[i]->nb_nodes() == 3) ? 1 : 0;
+      nb_Q4s += (elts[i]->nb_nodes() == 4) ? 1 : 0;
+    }
+
+    if (nb_T3s)
+    {
+      fprintf(file, "Triangles\n");
+      fprintf(file, "%i\n", nb_T3s);
+      
+      bool valid;
+      const int *pC(nullptr);
+      for (int i = 0; i < NB_ELTS; ++i){
+        
+        if (elts[i]->nb_nodes() != 3) continue;
+
+        valid = true;
+        pC = elts[i]->nodes();
+        for (int k = 0; (k < 3) && valid; ++k)
+          valid = (*(pC + k) < nb_pts) && (*(pC + k) >= 0);
+
+        if (valid)
+          fprintf(file, "%i %i %i 0\n", *(pC)+1, *(pC + 1) + 1, *(pC + 2) + 1);
+      }
+    }
+
+    if (nb_Q4s)
+    {
+      fprintf(file, "Quadrilaterals\n");
+      fprintf(file, "%i\n", nb_Q4s);
+
+      bool valid;
+      const int *pC(nullptr);
+      for (int i = 0; i < NB_ELTS; ++i) {
+
+        if (elts[i]->nb_nodes() != 4) continue;
+
+        valid = true;
+        pC = elts[i]->nodes();
+        for (int k = 0; (k < 4) && valid; ++k)
+          valid = (*(pC + k) < nb_pts) && (*(pC + k) >= 0);
+
+        if (valid)
+          fprintf(file, "%i %i %i %i 0\n", *(pC)+1, *(pC + 1) + 1, *(pC + 2) + 1, *(pC + 3) + 1);
+      }
+    }
+
+    fprintf(file, "End\n");
+    fclose(file);
+
+    return 0;
+  }
   
   ///
   static void
     get_words
-    (const std::string& str_line, char delim, std::vector<std::string>& oWords)
+    (const std::string& str_line, char delim, char** oWords)
   {
-    oWords.clear();
-    //oWords[0]=oWords[1]=oWords[2]=oWords[3]=oWords[4]=oWords[5]=oWords[6]=oWords[7]=oWords[8]=oWords[9]="";
+    //oWords.clear();
+    oWords[0]=oWords[1]=oWords[2]=oWords[3]=oWords[4]=oWords[5]=oWords[6]=oWords[7]=oWords[8]=oWords[9]=(char*)"";
     
     char* buf = const_cast<char*>(str_line.c_str());
     char* pch = strtok(buf," ");
     int c=0;
     while (pch != NULL)
     {
-      oWords.push_back(pch);
-      //oWords[c++]=pch;
+      //oWords.push_back(pch);
+      oWords[c++]=pch;
       pch = strtok (NULL, " ");
     }
   }
