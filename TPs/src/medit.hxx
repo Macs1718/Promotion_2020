@@ -28,7 +28,7 @@ public:
   {
   std::string                  line, entity;
   char cline[512];
-  char* words[10];
+  std::vector<std::string> words;
   std::ifstream                file (filename);
   FILE * fp = fopen(filename, "r");
   int                          nb_entities, i, nb_read;
@@ -61,12 +61,12 @@ public:
     if (line.empty())
       continue;
             
-    get_words(line, ' ', &words[0]);
+    get_words(line, ' ', words);
 
     if ((curType == VERT) && (nb_read < nb_entities))
     {
       for (i = 0; i < 3; ++i)
-        P[i] = fast_atof(words[i]);
+        P[i] = fast_atof(words[i].c_str());
 
       pos.add(P);
       ++nb_read;
@@ -77,7 +77,7 @@ public:
     {
       nods = nb_nodes[curType];
       for (i = 0; i < nods; ++i)
-        S[i] = fast_atoindex(words[i])-1;
+        S[i] = fast_atoindex(words[i].c_str())-1;
 
       switch (curType)
       {
@@ -92,53 +92,63 @@ public:
       ++nb_read;
       continue;
     }
+
     
     entity = words[0];
     curType = NONE;
 
-    if (entity == "End\n")
-        break;
-    if (entity == "Dimension\n")
+    
+    if (entity.compare("End") == 0)
     {
+      
+        break;
+    }
+    if (entity.compare("Dimension") == 0)
+    {
+      
       fgets(cline, 512, fp);
       //dim = fast_atoindex(cline);
 		  continue;
     }
-    if ( (entity == "Vertices\n") || (entity == "Edges\n") || (entity == "Triangles\n") || (entity == "Quadrilaterals\n") || (entity == "Tetrahedra\n") || (entity == "Hexahedra\n") )
+
+    //std::cout << "c : entity" << entity << std::endl;
+
+    if ( (entity.compare(0,8,"Vertices") == 0) || (entity.compare("Edges") == 0) || (entity.compare(0,9,"Triangles") == 0) || (entity.compare(0, 14,"Quadrilaterals") ==0 ) || (entity.compare(0,10,"Tetrahedra") == 0) || (entity.compare("Hexahedra") == 0) )
     {      
+
       fgets(cline, 512, fp);
       line = cline;
       get_words(line, ' ', words);
 
-      nb_entities = atoi(words[0]);
+      nb_entities = atoi(words[0].c_str());
       nb_read=0;
 
-      if (entity == "Vertices\n")
+      if (entity.compare(0,8,"Vertices") == 0)
       {
         pos.reserve(nb_entities);
         curType = VERT;
       }
-      else if (entity == "Edges\n")
+      else if (entity.compare("Edges") == 0)
       {
         connectE2.reserve(nb_entities);
         curType = EDGE;
       }
-      else if (entity == "Triangles\n")
+      else if (entity.compare(0,9,"Triangles") == 0)
       {
         connectT3.reserve(nb_entities);
         curType = TRI;
       }
-      else if (entity == "Quadrilaterals\n")
+      else if (entity.compare(0,14,"Quadrilaterals") == 0)
       {
         connectQ4.reserve(nb_entities);
         curType = QUAD;
       }
-      else if (entity == "Tetrahedra\n")
+      else if (entity.compare(0,10,"Tetrahedra") == 0)
       {
         connectTH4.reserve(nb_entities);
         curType = TET;
       }
-      else if (entity == "Hexahedra\n")
+      else if (entity.compare("Hexahedra") == 0)
       {
         connectHX8.reserve(nb_entities);
         curType = HEX;
@@ -205,7 +215,7 @@ public:
     fprintf(file, "Quadrilaterals\n");
   else if ((nb_nods == 4) && (et.find("TETRA") != std::string::npos)) // TH4
     fprintf(file, "Tetrahedra\n");
-  else if (nb_nods == 6) // Wedges
+  else if (nb_nods == 8) // Hexahedra
     fprintf(file, "Hexahedra\n");
   else //Unknonw
     return 1;
@@ -378,18 +388,18 @@ public:
   ///
   static void
     get_words
-    (const std::string& str_line, char delim, char** oWords)
+    (const std::string& str_line, char delim, std::vector<std::string>& oWords)
   {
-    //oWords.clear();
-    oWords[0]=oWords[1]=oWords[2]=oWords[3]=oWords[4]=oWords[5]=oWords[6]=oWords[7]=oWords[8]=oWords[9]=(char*)"";
+    oWords.clear();
+    //oWords[0]=oWords[1]=oWords[2]=oWords[3]=oWords[4]=oWords[5]=oWords[6]=oWords[7]=oWords[8]=oWords[9]="";
     
     char* buf = const_cast<char*>(str_line.c_str());
     char* pch = strtok(buf," ");
     int c=0;
     while (pch != NULL)
     {
-      //oWords.push_back(pch);
-      oWords[c++]=pch;
+      oWords.push_back(pch);
+      //oWords[c++]=pch;
       pch = strtok (NULL, " ");
     }
   }
