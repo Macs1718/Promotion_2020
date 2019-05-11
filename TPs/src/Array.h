@@ -1,4 +1,6 @@
-#pragma once
+#ifndef __ARRAY_H__
+#define __ARRAY_H__
+
 #include <vector>
 
 template <typename T>
@@ -120,3 +122,4 @@ int Array<T>::stride() const
   return _stride;
 }
 
+#endif
